@@ -1,0 +1,80 @@
+name: PHPBB Lab Core CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phpbb-lab-core-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-quality:
+    name: Source quality (PHP 8.2)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+          tools: composer:v2
+
+      - name: Validate phpBB Composer metadata
+        run: composer validate --working-dir=phpBB --no-check-publish
+
+      - name: Lint PHP source
+        shell: bash
+        run: |
+          set -euo pipefail
+          find phpBB -type f -name '*.php' -not -path '*/vendor/*' -print0 | xargs -0 -n1 -P4 php -l >/tmp/php-lint.log
+          echo "PHP syntax validation completed successfully."
+
+      - name: Enforce public-source hygiene
+        shell: bash
+        run: |
+          set -euo pipefail
+          bad_files="$(git ls-files | grep -E '(^phpBB/config\.php$|^phpBB/PHPBB_LAB_CORE_.*\.zip$|^phpBB/install\.disabled/|^\.rebuild2?/|^\.phpbb-lab-bootstrap$)' || true)"
+          if [ -n "$bad_files" ]; then
+            echo "Forbidden deployment/runtime artefacts are tracked:"
+            echo "$bad_files"
+            exit 1
+          fi
+          echo "No forbidden deployment/runtime artefacts are tracked."
+
+      - name: Verify PHPBB Lab Core structural components
+        shell: bash
+        run: |
+          set -euo pipefail
+          required_files=(
+            phpBB/phpbb/db/driver/doctrine_bridge.php
+            phpBB/phpbb/db/driver/doctrine_result.php
+            phpBB/phpbb/forum/controller/viewforum.php
+            phpBB/phpbb/forum/controller/viewtopic.php
+            phpBB/phpbb/template/twig/context_data_builder.php
+            phpBB/phpbb/template/twig/environment_manager.php
+            phpBB/phpbb/template/twig/renderer.php
+            phpBB/phpbb/template/twig/style_path_manager.php
+            docs/ARCHITECTURE.md
+            docs/HISTORY.md
+            docs/UPSTREAM.md
+            docs/VALIDATION.md
+            STATUS.md
+          )
+          for file in "${required_files[@]}"; do
+            test -f "$file" || { echo "Missing required project component: $file"; exit 1; }
+          done
+          echo "PHPBB Lab Core structural components are present."
