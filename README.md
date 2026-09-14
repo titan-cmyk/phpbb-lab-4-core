@@ -69,10 +69,12 @@ This repository contains source code and project documentation only. Server-spec
 
 ## Documentation
 
+- `STATUS.md` — current project status, confidence level and near-term roadmap.
 - `docs/ARCHITECTURE.md` — architectural overview and design goals.
 - `docs/HISTORY.md` — reconstructed and validated PHPBB Lab development history.
 - `docs/UPSTREAM.md` — provenance and relationship with upstream phpBB work.
 - `docs/VALIDATION.md` — validation scope and known limitations.
+- `docs/SOURCE_POLICY.md` — public-source inclusion and exclusion rules.
 - `SECURITY.md` — responsible security reporting and production-use warning.
 
 ## Contributing
