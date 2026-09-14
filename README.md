@@ -1,5 +1,7 @@
 # PHPBB Lab 4 Core
 
+[![PHPBB Lab Core CI](https://github.com/titan-cmyk/phpbb-lab-4-core/actions/workflows/phpbb-lab-core-ci.yml/badge.svg)](https://github.com/titan-cmyk/phpbb-lab-4-core/actions/workflows/phpbb-lab-core-ci.yml)
+
 > **Independent experimental development branch based on phpBB 4. Not an official phpBB release and not intended for production use.**
 
 PHPBB Lab 4 Core is an independent engineering project maintained by **phpbb-lab** to explore architectural refactoring, modularisation, compatibility-preserving modernisation and deeper use of contemporary PHP infrastructure in the phpBB 4 development codebase.
