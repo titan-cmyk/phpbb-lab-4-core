@@ -1,13 +1,19 @@
 # Security Policy
 
-## Reporting a Vulnerability
+## Experimental status
 
-Please do not post potential security vulnerabilities publicly. Instead, report them to the phpBB team.
-We take security very seriously and will respond to reports about potential security vulnerabilities as quickly as possible.
-There are multiple ways a potential security vulnerability can be reported:
+PHPBB Lab 4 Core is an experimental development branch and is **not intended for production use**.
 
-- HackerOne: [phpBB | Vulnerability Disclosure Program | HackerOne](https://hackerone.com/phpbb)
-- Create a report in the security tracker: [Security Tracker](https://www.phpbb.com/security/)
-- Send an email: [security@phpbb.com](mailto:security@phpbb.com)
+Do not deploy this repository as a production forum on the assumption that it receives the same review, release engineering or security support as an official phpBB release.
 
-Please provide as much detail as possible when reporting a vulnerability. You can expect to receive an update on your report within a few days. If the vulnerability is accepted, we will work on a fix and keep you informed of the progress. If the vulnerability is declined, we will provide an explanation.
+## Reporting a vulnerability
+
+Please do not publish exploit details or sensitive vulnerability information in a public issue.
+
+For a vulnerability that also affects upstream phpBB, follow the official phpBB security reporting process so the phpBB project can coordinate a responsible fix.
+
+For a vulnerability specific to PHPBB Lab experimental changes, contact the PHPBB Lab maintainer privately before public disclosure. A public issue may be opened after sensitive details have been removed or a fix is available.
+
+## Secrets and runtime data
+
+The public repository must never contain deployment credentials, database passwords, private keys, production configuration, user uploads, session/cache data or server backups. If such material is ever discovered in repository history, treat the credential as compromised and rotate it; deleting the visible file alone is not sufficient.

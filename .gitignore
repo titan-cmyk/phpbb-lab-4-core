@@ -1,62 +1,42 @@
-# Excludes cache
+# phpBB runtime / local installation data
+/phpBB/config.php
 /phpBB/cache/*
 !/phpBB/cache/.htaccess
-!/phpBB/cache/index.html
-
-# Excludes user data
-/phpBB/config*.php*
-/phpBB/ext/*
+!/phpBB/cache/index.htm
 /phpBB/files/*
-/phpBB/images/avatars/gallery/*
-/phpBB/images/avatars/upload/*
-/phpBB/images/ranks/*
+!/phpBB/files/.htaccess
+!/phpBB/files/index.htm
 /phpBB/store/*
+!/phpBB/store/.htaccess
+!/phpBB/store/index.htm
+/phpBB/images/avatars/upload/*
+!/phpBB/images/avatars/upload/.htaccess
+!/phpBB/images/avatars/upload/index.htm
 
-# Excludes all custom langages
-/phpBB/language/*
-!/phpBB/language/en
+# Local dependencies and build artefacts
+/phpBB/vendor/
+/vendor/
+/node_modules/
+composer.lock
+.phpunit.result.cache
+coverage/
 
-# Excludes all custom styles
-/phpBB/styles/*
-!/phpBB/styles/prosilver
-!/phpBB/styles/prosilver/theme/en
-!/phpBB/styles/prosilver/theme/images
-!/phpBB/styles/all
+# Local development/editor files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.bak
+*.swp
 
-# Excludes all custom env
-/phpBB/config/*
-!/phpBB/config/default
-!/phpBB/config/development
-!/phpBB/config/installer
-!/phpBB/config/production
-!/phpBB/config/test
-!/phpBB/config/.htaccess
-
-# Excludes vendors
-/phpBB/vendor
-/phpBB/vendor-ext/*
-!/phpBB/vendor-ext/.git-keep
-/phpBB/composer-ext.json
-/phpBB/composer-ext.lock
-
-# Excludes test / dev files
-/phpunit.xml
-/.phpunit.result.cache
-/phpBB/composer.phar
-/tests/phpbb_unit_tests.sqlite*
-/tests/test_config*.php
-/tests/tmp/*
-/tests/vendor
-/vagrant/phpbb-install-config.yml
-/vagrant/.vagrant
-/vagrant/composer.lock
-/vagrant/vendor
-node_modules
-/build/package_signature
-
-# Excludes IDE / editors files
-*~
-.idea
-*.DS_Store*
-/.vscode
-/.phpunit.result.cache
+# PHPBB Lab deployment/reconstruction material
+*.zip
+*.tar
+*.tar.gz
+*.tar.xz
+*.sql
+*.sqlite
+*.sqlite3
+/.rebuild/

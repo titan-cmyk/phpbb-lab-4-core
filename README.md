@@ -1,53 +1,90 @@
-[<img src="phpBB/styles/all/imgs/svg/phpbb_logo_large_cosmic.svg" alt="phpBB" style="max-width:40%" width="400">](https://www.phpbb.com)
+# PHPBB Lab 4 Core
 
-phpBB is a free open-source bulletin board written in PHP.
+> **Independent experimental development branch based on phpBB 4. Not an official phpBB release and not intended for production use.**
 
-## 🧑🏻‍🤝🏻🧑🏽 Community
+PHPBB Lab 4 Core is an independent engineering project maintained by **phpbb-lab** to explore architectural refactoring, modularisation, compatibility-preserving modernisation and deeper use of contemporary PHP infrastructure in the phpBB 4 development codebase.
 
-Get your copy of phpBB, find support and lots more on [phpBB.com](https://www.phpbb.com). Discuss the development on [area51](https://area51.phpbb.com/phpBB/index.php).
+The project deliberately works inside the core rather than presenting these experiments as extensions or themes. Its purpose is technical: isolate responsibilities, reduce coupling in historically large execution paths, preserve compatibility where practical, validate changes through real board workflows, and make the resulting work reviewable.
 
-## 👨‍💻 Contribute
+## Project status
 
-1. [Create an account on phpBB.com](https://www.phpbb.com/community/ucp.php?mode=register)
-2. [Create a ticket (unless there already is one)](https://tracker.phpbb.com/secure/CreateIssue!default.jspa)
-3. Read our [Coding guidelines](https://area51.phpbb.com/docs/dev/development/coding_guidelines.html) and [Git Contribution Guidelines](https://area51.phpbb.com/docs/dev/development/git.html)
-4. Send us a pull request
+This repository is a **development and research branch**. It is not an official phpBB branch, is not endorsed by phpBB Limited, and should not be deployed to production systems.
 
-### 🏗️ Setting up a development build of phpBB
+The current validated development state is based on the phpBB 4 development line and contains work completed and exercised on the PHPBB Lab development environment during September 2026.
 
-To run an installation from the repo (and not from a pre-built package) on a local server, run the following commands:
+## Upstream provenance
 
-- Fork phpbb/phpbb to your GitHub account, then create a local clone of it:
-  ```
-  git clone https://github.com/your_github_name/phpbb.git
-  ```
-- Install phpBB's dependencies (from the root of your phpbb repo):
-  ```
-  cd phpBB
-  php ../composer.phar install
-  ```
+Upstream project: `phpbb/phpbb`
 
-Alternatively, you can read:
+Reference baseline used for reconstruction: `53ec60f98ff8b5c23b41d39cb6628930f82a87a4` (11 September 2026).
 
-* Our [Vagrant documentation](phpBB/docs/vagrant.md) to find out how to use Vagrant to develop and contribute to phpBB.
-* Our [GitHub Codespaces documentation](phpBB/docs/codespaces.md) to learn about phpBB's cloud-based development environment.
+PHPBB Lab preserves upstream copyright and licensing. Changes originating from upstream phpBB tickets or pull requests are identified as such in the project history; PHPBB Lab-specific adaptations are documented separately.
 
-## 📓 Documentation
+## Main engineering tracks
 
-phpBB's [Development Documentation](https://area51.phpbb.com/docs/dev/index.html) contains all the information you'll need to learn about developing for phpBB's core, extensions and automated testing.
+### Viewforum architecture
 
-## 🔬 Automated Testing
+The historical `viewforum.php` flow was decomposed into clearer responsibilities, including controller/application orchestration, forum data access, page preparation, topic retrieval and topic rendering. Existing extension-facing behaviour was preserved where applicable.
 
-We have unit and functional tests in order to prevent regressions. You can view the bamboo continuous integration [here](https://bamboo.phpbb.com) or check our GitHub Actions below:
+### Viewtopic architecture
 
-Branch  | Description | GitHub Actions |
-------- | ----------- | -------------- |
-**master** | Latest development version | ![Tests](https://github.com/phpbb/phpbb/actions/workflows/tests.yml/badge.svg?branch=master) |
-**3.3.x** | Development of version 3.3.x | ![Tests](https://github.com/phpbb/phpbb/actions/workflows/tests.yml/badge.svg?branch=3.3.x) |
+The large `viewtopic.php` execution path was split into dedicated components for topic/forum data, navigation, page preparation, post retrieval, author data, rendering, polls and final page processing. The public entry point delegates substantially more work to the application layer.
 
-## 📜 License
+### Dynamic extension service loading
 
-[GNU General Public License v2](http://opensource.org/licenses/gpl-2.0.php)
+Extensions can expose ordered service configuration files such as `services_10_repository.yml`, `services_20_controller.yml` and `services_30_listener.yml` without manually importing every service file from a single root configuration. The mechanism was validated with a dedicated dependency-chain test extension.
 
-## 🔋 Powered by
-[![JetBrains logo.](https://resources.jetbrains.com/storage/products/company/brand/logos/jetbrains.svg)](https://jb.gg/OpenSource)
+### Lightweight maintenance bootstrap
+
+Maintenance handling can return a minimal HTTP `503 Service Unavailable` response early in startup, avoiding a normal full phpBB application bootstrap while maintenance mode is active.
+
+### Template and Twig refactoring
+
+Template responsibilities were separated across dedicated components covering style/template path resolution, context construction, rendering, Twig environment management, handles, root/scalar data, block data, nested block selection and row metadata. The refactored path was exercised on public pages, profiles, ACP and MCP.
+
+### Doctrine DBAL integration
+
+The MySQL/MariaDB development path explores Doctrine DBAL as the primary SQL execution layer while retaining the historical phpBB database API as a compatibility surface. Work includes shared connection handling, query compatibility, transactions, nested transaction semantics, bulk inserts, SQL cache integration, positional and named parameters, typed/NULL parameters, parameter-aware LIMIT/OFFSET and SQL builders, plus migration of real viewforum/viewtopic and poll paths.
+
+### Upstream adaptations
+
+The development branch also integrates or adapts selected upstream phpBB work against the refactored architecture, including:
+
+- PHPBB-17609 / PR #6927 — jumpbox removal.
+- PHPBB-17600 / PR #6923 — mark-read controllers.
+- PHPBB3-15556 / PR #5122 — AM/PM translation support.
+- PHPBB3-15190 / PR #4807 — extension metadata manager work.
+
+These items remain attributed to their upstream origin; adaptations required by PHPBB Lab architecture are documented as project work rather than represented as original upstream authorship.
+
+## Validation approach
+
+Development has been exercised through normal phpBB workflows rather than isolated probes alone. Validated paths include topic creation, replies, quick reply, quoting, editing, deletion, private messages, forum creation, forum/topic browsing, profiles, ACP and MCP. Individual tracks also used targeted probes and syntax checks where appropriate.
+
+Passing those checks does **not** make this a production release. Broader automated test coverage, multi-database validation, upgrade-path testing, security review and upstream review remain necessary before any work should be considered for production or upstream integration.
+
+## Repository policy
+
+This repository contains source code and project documentation only. Server-specific runtime material is intentionally excluded: database credentials, `config.php`, caches, uploaded/runtime data, deployment backups, local ZIP packages, temporary diagnostics and development-environment secrets are not part of the public source tree.
+
+## Documentation
+
+- `docs/ARCHITECTURE.md` — architectural overview and design goals.
+- `docs/HISTORY.md` — reconstructed and validated PHPBB Lab development history.
+- `docs/UPSTREAM.md` — provenance and relationship with upstream phpBB work.
+- `docs/VALIDATION.md` — validation scope and known limitations.
+- `SECURITY.md` — responsible security reporting and production-use warning.
+
+## Contributing
+
+Technical review is welcome. Contributions should be narrowly scoped, explain compatibility impact, preserve upstream attribution, and include a reproducible validation plan. Changes intended for phpBB itself should ultimately be reduced to focused upstream-quality contributions rather than requiring adoption of this entire experimental branch.
+
+## Licensing and trademarks
+
+phpBB is free software distributed under the GNU General Public License version 2. This repository preserves the upstream licensing and copyright notices.
+
+**PHPBB Lab** is an independent project. It is not affiliated with or endorsed by phpBB Limited. The phpBB name and related marks belong to their respective owners.
+
+---
+
+Maintained by **phpbb-lab** for PHPBB Lab.
