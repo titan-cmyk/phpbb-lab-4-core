@@ -19,6 +19,7 @@ use Symfony\Component\Config\Resource\FileResource;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\YamlFileLoader;
 use Symfony\Component\DependencyInjection\Extension\Extension;
+use Symfony\Component\Finder\Finder;
 use phpbb\filesystem\helper as filesystem_helper;
 
 /**
@@ -66,7 +67,14 @@ class extension_base extends Extension
 	}
 
 	/**
-	 * Loads the services.yml file.
+	 * Loads the extension service configuration.
+	 *
+	 * The main environment/services file keeps its existing role. Additional
+	 * services_*.yml and services_*.yaml files in the same directory are then
+	 * loaded automatically in deterministic filename order.
+	 *
+	 * Files already loaded through an explicit YAML import are skipped so they
+	 * are not processed a second time by the automatic loader.
 	 *
 	 * @param ContainerBuilder $container A ContainerBuilder instance
 	 */
@@ -74,31 +82,102 @@ class extension_base extends Extension
 	{
 		$services_directory = false;
 		$services_file = false;
+		$environment = (string) $container->getParameter('core.environment');
 
-		if (file_exists($this->ext_path . 'config/' . $container->getParameter('core.environment') . '/container/environment.yml'))
+		if (file_exists($this->ext_path . 'config/' . $environment . '/container/environment.yml'))
 		{
-			$services_directory = $this->ext_path . 'config/' . $container->getParameter('core.environment') . '/container/';
+			$services_directory = 'config/' . $environment . '/container';
 			$services_file = 'environment.yml';
 		}
-		else if (!is_dir($this->ext_path . 'config/' . $container->getParameter('core.environment')))
+		else if (!is_dir($this->ext_path . 'config/' . $environment))
 		{
 			if (file_exists($this->ext_path . 'config/default/container/environment.yml'))
 			{
-				$services_directory = $this->ext_path . 'config/default/container/';
+				$services_directory = 'config/default/container';
 				$services_file = 'environment.yml';
 			}
-			else if (!is_dir($this->ext_path . 'config/default') && file_exists($this->ext_path . '/config/services.yml'))
+			else if (!is_dir($this->ext_path . 'config/default') && file_exists($this->ext_path . 'config/services.yml'))
 			{
-				$services_directory = $this->ext_path . 'config';
+				$services_directory = 'config';
 				$services_file = 'services.yml';
 			}
 		}
 
-		if ($services_directory && $services_file)
+		if (!$services_directory || !$services_file)
 		{
-			$loader = new YamlFileLoader($container, new FileLocator(filesystem_helper::realpath($services_directory)));
-			$loader->load($services_file);
+			return;
 		}
+
+		$absolute_services_directory = filesystem_helper::realpath($this->ext_path . $services_directory);
+		$loader = new YamlFileLoader($container, new FileLocator($absolute_services_directory));
+		$loader->load($services_file);
+
+		foreach ($this->get_services_filenames($absolute_services_directory) as $file)
+		{
+			$absolute_file = filesystem_helper::realpath($absolute_services_directory . '/' . $file);
+
+			if ($this->is_file_resource_loaded($container, $absolute_file))
+			{
+				continue;
+			}
+
+			$loader->load($file);
+		}
+	}
+
+	/**
+	 * Gets automatically loadable service configuration filenames.
+	 *
+	 * Files are limited to the selected service directory and sorted by name so
+	 * service override order is predictable. Numeric prefixes can therefore be
+	 * used when an extension needs an explicit order, for example
+	 * services_10_repository.yml and services_20_controller.yml.
+	 *
+	 * @param string $services_directory Absolute directory containing service files
+	 *
+	 * @return array<string>
+	 */
+	protected function get_services_filenames(string $services_directory): array
+	{
+		$finder = new Finder();
+		$finder
+			->files()
+			->depth('== 0')
+			->name('/^services_.*\.ya?ml$/')
+			->sortByName()
+			->in($services_directory);
+
+		$services_files = [];
+		foreach ($finder as $file)
+		{
+			$services_files[] = $file->getFilename();
+		}
+
+		return $services_files;
+	}
+
+	/**
+	 * Checks whether a service file has already been registered as a container resource.
+	 *
+	 * This prevents an explicitly imported services_*.yml file from being loaded
+	 * again by automatic discovery.
+	 *
+	 * @param ContainerBuilder $container    A ContainerBuilder instance
+	 * @param string           $service_file Absolute service file path
+	 *
+	 * @return bool
+	 */
+	protected function is_file_resource_loaded(ContainerBuilder $container, string $service_file): bool
+	{
+		foreach ($container->getResources() as $resource)
+		{
+			if ($resource instanceof FileResource && filesystem_helper::realpath((string) $resource) === $service_file)
+			{
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**
@@ -109,7 +188,7 @@ class extension_base extends Extension
 		$reflected = new \ReflectionClass($this);
 		$namespace = $reflected->getNamespaceName();
 
-		$class = $namespace . '\\di\configuration';
+		$class = $namespace . '\\di\\configuration';
 		if (class_exists($class))
 		{
 			$r = new \ReflectionClass($class);

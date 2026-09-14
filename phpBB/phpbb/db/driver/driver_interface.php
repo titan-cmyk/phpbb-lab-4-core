@@ -72,6 +72,65 @@ interface driver_interface
 	public function get_db_connect_id();
 
 	/**
+	 * Gets the Doctrine DBAL connection associated with the active phpBB driver.
+	 *
+	 * Drivers which have not been migrated to Doctrine yet return null.
+	 * The connection is created lazily so the legacy phpBB connection remains the
+	 * only database connection unless Doctrine is explicitly requested.
+	 *
+	 * @return \Doctrine\DBAL\Connection|null
+	 */
+	public function get_doctrine_connection();
+
+	/**
+	 * Execute a parameterised SELECT (or other row-returning statement) through Doctrine DBAL.
+	 *
+	 * @param string $sql
+	 * @param array $params
+	 * @param array $types
+	 * @return \Doctrine\DBAL\Result
+	 */
+	public function doctrine_execute_query($sql, array $params = [], array $types = []);
+
+	/**
+	 * Execute a parameterised data-changing statement through Doctrine DBAL.
+	 *
+	 * @param string $sql
+	 * @param array $params
+	 * @param array $types
+	 * @return int Number of affected rows
+	 */
+	public function doctrine_execute_statement($sql, array $params = [], array $types = []);
+
+	/**
+	 * Fetch one associative row through Doctrine DBAL.
+	 *
+	 * @return array|false
+	 */
+	public function doctrine_fetch_associative($sql, array $params = [], array $types = []);
+
+	/**
+	 * Fetch all associative rows through Doctrine DBAL.
+	 *
+	 * @return array
+	 */
+	public function doctrine_fetch_all_associative($sql, array $params = [], array $types = []);
+
+	/**
+	 * Fetch the first column of the first row through Doctrine DBAL.
+	 *
+	 * @return mixed|false
+	 */
+	public function doctrine_fetch_one($sql, array $params = [], array $types = []);
+
+	/**
+	 * Create a Doctrine DBAL QueryBuilder bound to the active phpBB database.
+	 *
+	 * @return \Doctrine\DBAL\Query\QueryBuilder
+	 */
+	public function doctrine_create_query_builder();
+
+	/**
 	* Indicates if an error was triggered.
 	*
 	* @return bool
@@ -339,6 +398,23 @@ interface driver_interface
 	public function sql_query_limit($query, $total, $offset = 0, $cache_ttl = 0);
 
 	/**
+	 * Execute a limited parameterised query.
+	 *
+	 * Doctrine-backed drivers bind parameters natively. Legacy drivers retain
+	 * compatibility through the base driver fallback before applying their
+	 * database-specific LIMIT syntax.
+	 *
+	 * @param string $query SQL query containing placeholders
+	 * @param int $total Maximum rows to return, 0 for driver-specific unlimited semantics
+	 * @param int $offset Zero-based row offset
+	 * @param array $params Bound parameter values
+	 * @param array $types Doctrine/driver parameter types where supported
+	 * @param int $cache_ttl SQL cache lifetime in seconds
+	 * @return mixed Buffered, seekable result handle, false on error
+	 */
+	public function sql_query_limit_params($query, $total, $offset = 0, array $params = [], array $types = [], $cache_ttl = 0);
+
+	/**
 	* Base query method
 	*
 	* @param	string	$query		The SQL query to execute
@@ -347,6 +423,49 @@ interface driver_interface
 	* @return	mixed	Buffered, seekable result handle, false on error
 	*/
 	public function sql_query($query = '', $cache_ttl = 0);
+
+	/**
+	 * Execute a parameterised query through the active database driver.
+	 *
+	 * Doctrine-backed drivers use real bound parameters. Legacy drivers retain
+	 * compatibility through the base driver's positional-parameter fallback.
+	 *
+	 * @param string $query SQL query containing positional or driver-supported named placeholders
+	 * @param array $params Bound parameter values
+	 * @param array $types Doctrine/driver parameter types where supported
+	 * @param int $cache_ttl Result-cache lifetime in seconds for row-producing queries
+	 * @return mixed Buffered/seekable result handle, true for successful statements, false on error
+	 */
+	public function sql_query_params($query, array $params = [], array $types = [], $cache_ttl = 0);
+
+
+	/**
+	 * Build a phpBB-style SQL fragment using named bound parameters instead of
+	 * interpolating escaped values into the SQL string.
+	 *
+	 * Supported query types mirror sql_build_array(): INSERT, INSERT_SELECT,
+	 * UPDATE, SELECT and DELETE. Generated values are appended to $params.
+	 *
+	 * @param string $query Query fragment type
+	 * @param array $assoc_ary Field/value map
+	 * @param array $params Bound parameters populated by this method
+	 * @param string $prefix Parameter-name prefix
+	 * @return string|false SQL fragment or false for invalid input
+	 */
+	public function sql_build_array_params($query, $assoc_ary, array &$params, $prefix = 'p');
+
+	/**
+	 * Build an IN/NOT IN predicate using named bound parameters.
+	 *
+	 * @param string $field SQL field/expression
+	 * @param array|mixed $array Values for the set
+	 * @param array $params Bound parameters populated by this method
+	 * @param bool $negate Build NOT IN instead of IN
+	 * @param bool $allow_empty_set Preserve phpBB empty-set semantics
+	 * @param string $prefix Parameter-name prefix
+	 * @return string SQL predicate
+	 */
+	public function sql_in_set_params($field, $array, array &$params, $negate = false, $allow_empty_set = false, $prefix = 'in');
 
 	/**
 	* Returns SQL string to cast an integer expression to a string.

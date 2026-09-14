@@ -165,6 +165,125 @@ abstract class driver implements driver_interface
 	}
 
 	/**
+	 * {@inheritdoc}
+	 */
+	public function get_doctrine_connection()
+	{
+		return null;
+	}
+
+	/**
+	 * Return the active Doctrine connection or fail explicitly on drivers which
+	 * have not yet been migrated.
+	 *
+	 * @return \Doctrine\DBAL\Connection
+	 */
+	protected function require_doctrine_connection()
+	{
+		$connection = $this->get_doctrine_connection();
+		if (!$connection)
+		{
+			throw new \LogicException('Doctrine DBAL is not available for the active phpBB database driver.');
+		}
+
+		return $connection;
+	}
+
+	/**
+	 * {@inheritdoc}
+	 */
+	public function doctrine_execute_query($sql, array $params = [], array $types = [])
+	{
+		$connection = $this->require_doctrine_connection();
+		$started = microtime(true);
+
+		try
+		{
+			return $connection->executeQuery($sql, $params, $types);
+		}
+		finally
+		{
+			$this->sql_time += microtime(true) - $started;
+			$this->sql_add_num_queries(false);
+		}
+	}
+
+	/**
+	 * {@inheritdoc}
+	 */
+	public function doctrine_execute_statement($sql, array $params = [], array $types = [])
+	{
+		$connection = $this->require_doctrine_connection();
+		$started = microtime(true);
+
+		try
+		{
+			return $connection->executeStatement($sql, $params, $types);
+		}
+		finally
+		{
+			$this->sql_time += microtime(true) - $started;
+			$this->sql_add_num_queries(false);
+		}
+	}
+
+	/**
+	 * {@inheritdoc}
+	 */
+	public function doctrine_fetch_associative($sql, array $params = [], array $types = [])
+	{
+		$result = $this->doctrine_execute_query($sql, $params, $types);
+		try
+		{
+			return $result->fetchAssociative();
+		}
+		finally
+		{
+			$result->free();
+		}
+	}
+
+	/**
+	 * {@inheritdoc}
+	 */
+	public function doctrine_fetch_all_associative($sql, array $params = [], array $types = [])
+	{
+		$result = $this->doctrine_execute_query($sql, $params, $types);
+		try
+		{
+			return $result->fetchAllAssociative();
+		}
+		finally
+		{
+			$result->free();
+		}
+	}
+
+	/**
+	 * {@inheritdoc}
+	 */
+	public function doctrine_fetch_one($sql, array $params = [], array $types = [])
+	{
+		$result = $this->doctrine_execute_query($sql, $params, $types);
+		try
+		{
+			return $result->fetchOne();
+		}
+		finally
+		{
+			$result->free();
+		}
+	}
+
+	/**
+	 * {@inheritdoc}
+	 */
+	public function doctrine_create_query_builder()
+	{
+		return $this->require_doctrine_connection()->createQueryBuilder();
+	}
+
+	/**
 	* {@inheritdoc}
 	*/
 	public function get_sql_error_triggered()
@@ -290,6 +409,255 @@ abstract class driver implements driver_interface
 	abstract protected function _sql_close(): bool;
 
 	/**
+	 * {@inheritdoc}
+	 *
+	 * Drivers which have not yet migrated to native parameter binding retain a
+	 * compatibility implementation for positional placeholders. Migrated drivers
+	 * should override this method and bind values natively.
+	 */
+	public function sql_query_params($query, array $params = [], array $types = [], $cache_ttl = 0)
+	{
+		if (!$params)
+		{
+			return $this->sql_query($query, $cache_ttl);
+		}
+
+		return $this->sql_query($this->sql_interpolate_params($query, $params), $cache_ttl);
+	}
+
+	/**
+	 * Safely interpolate positional parameters for legacy drivers which do not
+	 * provide native parameter binding. Placeholders inside quoted strings,
+	 * identifiers and SQL comments are ignored.
+	 *
+	 * @param string $query
+	 * @param array $params Positional parameter list
+	 * @return string
+	 */
+	protected function sql_interpolate_params($query, array $params)
+	{
+		// The generic compatibility path deliberately supports positional
+		// placeholders only. Doctrine-backed drivers may additionally support named
+		// placeholders in their native override.
+		if (array_keys($params) !== range(0, count($params) - 1))
+		{
+			throw new \InvalidArgumentException('Named SQL parameters require a driver with native parameter binding.');
+		}
+
+		$index = 0;
+		$length = strlen((string) $query);
+		$sql = '';
+		$state = 'normal';
+
+		for ($i = 0; $i < $length; $i++)
+		{
+			$char = $query[$i];
+			$next = ($i + 1 < $length) ? $query[$i + 1] : '';
+
+			if ($state === 'normal')
+			{
+				if ($char === "'") { $state = 'single'; $sql .= $char; continue; }
+				if ($char === '"') { $state = 'double'; $sql .= $char; continue; }
+				if ($char === '`') { $state = 'backtick'; $sql .= $char; continue; }
+				if ($char === '#') { $state = 'line'; $sql .= $char; continue; }
+				if ($char === '-' && $next === '-' && ($i + 2 >= $length || ctype_space($query[$i + 2]))) { $state = 'line'; $sql .= '--'; $i++; continue; }
+				if ($char === '/' && $next === '*') { $state = 'block'; $sql .= '/*'; $i++; continue; }
+
+				if ($char === '?')
+				{
+					if (!array_key_exists($index, $params))
+					{
+						throw new \InvalidArgumentException('Not enough SQL parameters for positional placeholders.');
+					}
+					$sql .= $this->sql_parameter_literal($params[$index++]);
+					continue;
+				}
+			}
+			else if ($state === 'single' || $state === 'double')
+			{
+				$quote = ($state === 'single') ? "'" : '"';
+				if ($char === '\\' && $next !== '') { $sql .= $char . $next; $i++; continue; }
+				if ($char === $quote)
+				{
+					if ($next === $quote) { $sql .= $char . $next; $i++; continue; }
+					$state = 'normal';
+				}
+			}
+			else if ($state === 'backtick' && $char === '`')
+			{
+				$state = 'normal';
+			}
+			else if ($state === 'line' && ($char === "\n" || $char === "\r"))
+			{
+				$state = 'normal';
+			}
+			else if ($state === 'block' && $char === '*' && $next === '/')
+			{
+				$sql .= '*/';
+				$i++;
+				$state = 'normal';
+				continue;
+			}
+
+			$sql .= $char;
+		}
+
+		if ($index !== count($params))
+		{
+			throw new \InvalidArgumentException('Too many SQL parameters for positional placeholders.');
+		}
+
+		return $sql;
+	}
+
+
+	/**
+	 * Return the next collision-free named parameter key.
+	 *
+	 * @param array $params Existing parameter map
+	 * @param string $prefix Requested prefix
+	 * @return string Parameter name without leading colon
+	 */
+	protected function sql_next_parameter_name(array $params, $prefix)
+	{
+		$prefix = preg_replace('/[^A-Za-z0-9_]/', '_', (string) $prefix);
+		if ($prefix === '' || ctype_digit(substr($prefix, 0, 1)))
+		{
+			$prefix = 'p_' . $prefix;
+		}
+
+		$index = count($params);
+		do
+		{
+			$name = $prefix . $index++;
+		}
+		while (array_key_exists($name, $params));
+
+		return $name;
+	}
+
+	/**
+	 * {@inheritdoc}
+	 */
+	public function sql_build_array_params($query, $assoc_ary, array &$params, $prefix = 'p')
+	{
+		if (!is_array($assoc_ary) || !count($assoc_ary))
+		{
+			return false;
+		}
+
+		$query = strtoupper((string) $query);
+		$fields = [];
+		$values = [];
+
+		if ($query === 'INSERT' || $query === 'INSERT_SELECT')
+		{
+			foreach ($assoc_ary as $key => $var)
+			{
+				$fields[] = $key;
+
+				if ($query === 'INSERT_SELECT' && is_array($var) && isset($var[0]) && is_string($var[0]))
+				{
+					$values[] = $var[0];
+				}
+				else
+				{
+					$name = $this->sql_next_parameter_name($params, $prefix);
+					$params[$name] = $var;
+					$values[] = ':' . $name;
+				}
+			}
+
+			if ($query === 'INSERT')
+			{
+				return ' (' . implode(', ', $fields) . ') VALUES (' . implode(', ', $values) . ')';
+			}
+
+			return ' (' . implode(', ', $fields) . ') SELECT ' . implode(', ', $values) . ' ';
+		}
+
+		if ($query === 'MULTI_INSERT')
+		{
+			trigger_error('The MULTI_INSERT query value is no longer supported. Please use sql_multi_insert() instead.', E_USER_ERROR);
+		}
+
+		if ($query === 'UPDATE' || $query === 'SELECT' || $query === 'DELETE')
+		{
+			foreach ($assoc_ary as $key => $var)
+			{
+				$name = $this->sql_next_parameter_name($params, $prefix);
+				$params[$name] = $var;
+				$values[] = $key . ' = :' . $name;
+			}
+
+			return implode(($query === 'UPDATE') ? ', ' : ' AND ', $values);
+		}
+
+		return false;
+	}
+
+	/**
+	 * {@inheritdoc}
+	 */
+	public function sql_in_set_params($field, $array, array &$params, $negate = false, $allow_empty_set = false, $prefix = 'in')
+	{
+		$array = (array) $array;
+
+		if (!count($array))
+		{
+			if (!$allow_empty_set)
+			{
+				$this->sql_error('No values specified for SQL IN comparison');
+			}
+
+			return $negate ? '1=1' : '1=0';
+		}
+
+		$placeholders = [];
+		foreach ($array as $value)
+		{
+			$name = $this->sql_next_parameter_name($params, $prefix);
+			$params[$name] = $value;
+			$placeholders[] = ':' . $name;
+		}
+
+		if (count($placeholders) === 1)
+		{
+			return $field . ($negate ? ' <> ' : ' = ') . $placeholders[0];
+		}
+
+		return $field . ($negate ? ' NOT IN ' : ' IN ') . '(' . implode(', ', $placeholders) . ')';
+	}
+
+	/**
+	 * Convert one compatibility-bound value into a SQL literal.
+	 *
+	 * @param mixed $value
+	 * @return string
+	 */
+	protected function sql_parameter_literal($value)
+	{
+		if ($value === null)
+		{
+			return 'NULL';
+		}
+		if (is_bool($value))
+		{
+			return $value ? '1' : '0';
+		}
+		if (is_int($value))
+		{
+			return (string) $value;
+		}
+		if (is_float($value))
+		{
+			return json_encode($value, JSON_PRESERVE_ZERO_FRACTION);
+		}
+
+		return "'" . $this->sql_escape((string) $value) . "'";
+	}
+
+	/**
 	* {@inheritDoc}
 	*/
 	function sql_query_limit($query, $total, $offset = 0, $cache_ttl = 0)
@@ -304,6 +672,31 @@ abstract class driver implements driver_interface
 		$offset = ($offset < 0) ? 0 : $offset;
 
 		return $this->_sql_query_limit($query, $total, $offset, $cache_ttl);
+	}
+
+	/**
+	 * {@inheritdoc}
+	 */
+	public function sql_query_limit_params($query, $total, $offset = 0, array $params = [], array $types = [], $cache_ttl = 0)
+	{
+		if (empty($query))
+		{
+			return false;
+		}
+
+		$total = ($total < 0) ? 0 : (int) $total;
+		$offset = ($offset < 0) ? 0 : (int) $offset;
+
+		if (!$params)
+		{
+			return $this->sql_query_limit($query, $total, $offset, $cache_ttl);
+		}
+
+		// Generic drivers keep portability by safely interpolating positional
+		// parameters before delegating to their existing database-specific LIMIT
+		// implementation. Doctrine-backed drivers override this method and bind
+		// parameters natively.
+		return $this->sql_query_limit($this->sql_interpolate_params($query, $params), $total, $offset, $cache_ttl);
 	}
 
 	/**

@@ -957,6 +957,11 @@ $lang = array_merge($lang, array(
 	'YOU_LAST_VISIT'	=> 'Last visit was: %s',
 
 	'datetime'			=> array(
+		'am'		=> 'am',
+		'AM'		=> 'AM',
+		'pm'		=> 'pm',
+		'PM'		=> 'PM',
+
 		'TODAY'		=> 'Today',
 		'TOMORROW'	=> 'Tomorrow',
 		'YESTERDAY'	=> 'Yesterday',

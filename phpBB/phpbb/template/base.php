@@ -13,6 +13,13 @@
 
 namespace phpbb\template;
 
+/**
+* Base template facade.
+*
+* PHPBB Lab Core refactor: handle registration is delegated to handle_manager
+* and batch root-variable operations are delegated directly to context instead
+* of being expanded into repeated public API calls.
+*/
 abstract class base implements template
 {
 	/**
@@ -24,31 +31,53 @@ abstract class base implements template
 	protected $context;
 
 	/**
-	* Array of filenames assigned to set_filenames
+	* Array of filenames assigned to set_filenames.
+	*
+	* Kept for backwards compatibility with subclasses that access the
+	* historical protected property directly.
 	*
 	* @var array
 	*/
 	protected $filenames = array();
+
+	/** @var \phpbb\template\handle_manager|null */
+	private $handle_manager;
 
 	/**
 	* {@inheritdoc}
 	*/
 	public function set_filenames(array $filename_array)
 	{
-		$this->filenames = array_merge($this->filenames, $filename_array);
+		$this->get_handle_manager()->set_filenames($filename_array);
 
 		return $this;
 	}
 
 	/**
-	* Get a filename from the handle
+	* Get a filename from the handle.
 	*
 	* @param string $handle
 	* @return string
 	*/
 	protected function get_filename_from_handle($handle)
 	{
-		return (isset($this->filenames[$handle])) ? $this->filenames[$handle] : $handle;
+		return $this->get_handle_manager()->get_filename($handle);
+	}
+
+	/**
+	* Lazily create the handle manager while preserving the historical
+	* protected filenames array as the canonical storage.
+	*
+	* @return \phpbb\template\handle_manager
+	*/
+	private function get_handle_manager()
+	{
+		if (!$this->handle_manager)
+		{
+			$this->handle_manager = new handle_manager($this->filenames);
+		}
+
+		return $this->handle_manager;
 	}
 
 	/**
@@ -76,10 +105,7 @@ abstract class base implements template
 	*/
 	public function assign_vars(array $vararray)
 	{
-		foreach ($vararray as $key => $val)
-		{
-			$this->assign_var($key, $val);
-		}
+		$this->context->assign_vars($vararray);
 
 		return $this;
 	}
@@ -109,12 +135,7 @@ abstract class base implements template
 	*/
 	public function retrieve_vars(array $vararray)
 	{
-		$result = array();
-		foreach ($vararray as $varname)
-		{
-			$result[$varname] = $this->retrieve_var($varname);
-		}
-		return $result;
+		return $this->context->retrieve_vars($vararray);
 	}
 
 	/**

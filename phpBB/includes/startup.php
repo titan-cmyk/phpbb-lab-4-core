@@ -30,6 +30,58 @@ if (version_compare(PHP_VERSION, '8.2.0', '<'))
 	die('You are running an unsupported PHP version (' . PHP_VERSION . '). Please upgrade to PHP 8.2.0 or higher before trying to install or update to phpBB 4.0');
 }
 
+
+/**
+ * Serve the pre-generated lightweight maintenance page, when available.
+ *
+ * This check deliberately runs before Composer autoloading, the DI container,
+ * database access and session initialisation. CLI and installer requests are
+ * allowed to continue so maintenance/update commands remain usable.
+ */
+if (
+	PHP_SAPI !== 'cli'
+	&& PHP_SAPI !== 'phpdbg'
+	&& !defined('IN_INSTALL')
+	&& is_file($phpbb_root_path . 'store/UPDATE_LOCK.php')
+)
+{
+	phpbb_send_lightweight_maintenance($phpbb_root_path . 'store/UPDATE_LOCK.php');
+}
+
+/**
+ * Send a pre-generated maintenance response without bootstrapping phpBB.
+ *
+ * Invalid lock files are ignored and normal startup continues. This prevents a
+ * damaged or partially written lock file from making the board unreachable.
+ *
+ * @param string $lock_file Absolute or phpBB-root-relative lock file path
+ * @return void
+ */
+function phpbb_send_lightweight_maintenance(string $lock_file): void
+{
+	$maintenance_data = include $lock_file;
+
+	if (!is_array($maintenance_data) || !isset($maintenance_data['content']) || !is_string($maintenance_data['content']) || $maintenance_data['content'] === '')
+	{
+		return;
+	}
+
+	http_response_code(503);
+	header('Retry-After: 600');
+	header('Content-Type: text/html; charset=utf-8');
+	header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+	header('Pragma: no-cache');
+	header('Expires: 0');
+	header('X-Robots-Tag: noindex, nofollow, noarchive, nosnippet');
+
+	if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'HEAD')
+	{
+		echo $maintenance_data['content'];
+	}
+
+	exit;
+}
+
 // In PHP 5.3.0 the error level has been raised to E_WARNING which causes problems
 // because we show E_WARNING errors and do not set a default timezone.
 // This is because we have our own timezone handling and work in UTC only anyway.

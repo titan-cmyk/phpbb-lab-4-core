@@ -37,6 +37,34 @@ class metadata_manager
 	protected $metadata_file;
 
 	/**
+	 * Metadata validation registry.
+	 *
+	 * null   => validate_<name>()
+	 * string => regular expression for a scalar metadata field
+	 * array  => composed validation target
+	 *
+	 * @var array
+	 */
+	protected static $validations = array(
+		'all'			=> array('enable', 'display'),
+		'enable'		=> array('dir', 'require_phpbb', 'require_php'),
+		'display'		=> array('fields', 'authors'),
+		'fields'		=> array('name', 'type', 'license', 'version'),
+		'version-check'	=> array('version', 'version_check'),
+
+		'authors'		=> null,
+		'dir'			=> null,
+		'require_phpbb'	=> null,
+		'require_php'	=> null,
+		'version_check'	=> null,
+
+		'name'			=> '#^[a-zA-Z0-9_\x7f-\xff]{2,}/[a-zA-Z0-9_\x7f-\xff]{2,}$#',
+		'type'			=> '#^phpbb-extension$#',
+		'license'		=> '#.+#',
+		'version'		=> '#.+#',
+	);
+
+	/**
 	* Creates the metadata manager
 	*
 	* @param string				$ext_name			Name (including vendor) of the extension
@@ -57,7 +85,6 @@ class metadata_manager
 	*/
 	public function get_metadata($element = 'all')
 	{
-		// Fetch and clean the metadata if not done yet
 		if ($this->metadata === array())
 		{
 			$this->fetch_metadata_from_file();
@@ -67,7 +94,7 @@ class metadata_manager
 		{
 			case 'all':
 			default:
-				$this->validate();
+				$this->validate('display');
 				return $this->metadata;
 			break;
 
@@ -78,7 +105,17 @@ class metadata_manager
 			break;
 
 			case 'display-name':
-				return (isset($this->metadata['extra']['display-name'])) ? $this->metadata['extra']['display-name'] : $this->get_metadata('name');
+				return isset($this->metadata['extra']['display-name'])
+					? $this->metadata['extra']['display-name']
+					: $this->get_metadata('name');
+			break;
+
+			case 'version-check':
+				$this->validate('version-check');
+				return array_merge(
+					array('current_version' => $this->metadata['version']),
+					$this->metadata['extra']['version-check']
+				);
 			break;
 		}
 	}
@@ -131,43 +168,40 @@ class metadata_manager
 	*/
 	public function validate($name = 'display')
 	{
-		// Basic fields
-		$fields = array(
-			'name'		=> '#^[a-zA-Z0-9_\x7f-\xff]{2,}/[a-zA-Z0-9_\x7f-\xff]{2,}$#',
-			'type'		=> '#^phpbb-extension$#',
-			'license'	=> '#.+#',
-			'version'	=> '#.+#',
-		);
-
-		switch ($name)
+		if ($this->metadata === array())
 		{
-			case 'all':
-				$this->validate_enable();
-			// no break
+			$this->fetch_metadata_from_file();
+		}
 
-			case 'display':
-				foreach ($fields as $field => $data)
-				{
-					$this->validate($field);
-				}
+		if (!array_key_exists($name, static::$validations))
+		{
+			return true;
+		}
 
-				$this->validate_authors();
-			break;
+		$validation = static::$validations[$name];
 
-			default:
-				if (isset($fields[$name]))
-				{
-					if (!isset($this->metadata[$name]))
-					{
-						throw new \phpbb\extension\exception('META_FIELD_NOT_SET', array($name));
-					}
+		if ($validation === null)
+		{
+			$this->{'validate_' . $name}();
+		}
+		else if (is_string($validation))
+		{
+			if (!isset($this->metadata[$name]))
+			{
+				throw new \phpbb\extension\exception('META_FIELD_NOT_SET', array($name));
+			}
 
-					if (!preg_match($fields[$name], $this->metadata[$name]))
-					{
-						throw new \phpbb\extension\exception('META_FIELD_INVALID', array($name));
-					}
-				}
-			break;
+			if (!preg_match($validation, $this->metadata[$name]))
+			{
+				throw new \phpbb\extension\exception('META_FIELD_INVALID', array($name));
+			}
+		}
+		else if (is_array($validation))
+		{
+			foreach ($validation as $validator)
+			{
+				$this->validate($validator);
+			}
 		}
 
 		return true;
@@ -253,6 +287,25 @@ class metadata_manager
 		if (!isset($this->metadata['require']['php']))
 		{
 			throw new \phpbb\extension\exception('META_FIELD_NOT_SET', array('require php'));
+		}
+
+		return true;
+	}
+
+	/**
+	 * Validate extension version-check metadata.
+	 *
+	 * @return boolean
+	 * @throws \phpbb\extension\exception
+	 */
+	protected function validate_version_check()
+	{
+		if (!isset($this->metadata['extra']['version-check'])
+			|| !isset($this->metadata['extra']['version-check']['host'])
+			|| !isset($this->metadata['extra']['version-check']['directory'])
+			|| !isset($this->metadata['extra']['version-check']['filename']))
+		{
+			throw new \phpbb\extension\exception('NO_VERSIONCHECK');
 		}
 
 		return true;

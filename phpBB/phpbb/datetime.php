@@ -118,15 +118,38 @@ class datetime extends \DateTime
 					if ($day !== false)
 					{
 						// Format using the short formatting and finally swap out the relative token placeholder with the correct value
-						return str_replace(self::RELATIVE_WRAPPER . self::RELATIVE_WRAPPER, $this->user->lang['datetime'][$day], strtr(parent::format($format['format_short']), $format['lang']));
+						$formatted = strtr(parent::format($format['format_short']), $format['lang']);
+						return str_replace(self::RELATIVE_WRAPPER . self::RELATIVE_WRAPPER, $this->user->lang['datetime'][$day], $this->localize_meridiem($formatted));
 					}
 				}
 			}
 		}
 
-		return strtr(parent::format($format['format_long']), $format['lang']);
+		return $this->localize_meridiem(strtr(parent::format($format['format_long']), $format['lang']));
 	}
 
+	/**
+	 * Localise standalone AM/PM markers without replacing matching letters
+	 * inside translated day/month names or ordinary words.
+	 *
+	 * @param string $formatted Formatted date/time string
+	 * @return string
+	 */
+	protected function localize_meridiem($formatted)
+	{
+		return preg_replace_callback(
+			'/(?<!\p{L})(AM|PM|am|pm)(?!\p{L})/u',
+			function ($matches)
+			{
+				$token = $matches[1];
+
+				return isset($this->user->lang['datetime'][$token])
+					? $this->user->lang['datetime'][$token]
+					: $token;
+			},
+			$formatted
+		);
+	}
 	/**
 	* Magic method to convert DateTime object to string
 	*
@@ -160,7 +183,10 @@ class datetime extends \DateTime
 				'is_short'		=> strpos($format, self::RELATIVE_WRAPPER) !== false,
 				'format_short'	=> substr($format, 0, strpos($format, self::RELATIVE_WRAPPER)) . self::RELATIVE_WRAPPER . self::RELATIVE_WRAPPER . substr(strrchr($format, self::RELATIVE_WRAPPER), 1),
 				'format_long'	=> str_replace(self::RELATIVE_WRAPPER, '', $format),
-				'lang'			=> array_filter($user->lang['datetime'], 'is_string'),
+				'lang'			=> array_diff_key(
+					array_filter($user->lang['datetime'], 'is_string'),
+					array_flip(array('am', 'AM', 'pm', 'PM'))
+				),
 			);
 
 			// Short representation of month in format? Some languages use different terms for the long and short format of May

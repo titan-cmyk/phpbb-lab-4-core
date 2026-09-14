@@ -1,5 +1,4 @@
 services:
-
     phpbb.birthday.helper:
         class: phpbb\forum\birthday_helper
         arguments:
@@ -11,6 +10,13 @@ services:
             - '@template'
             - '@user'
 
+    forum.helper:
+        class: phpbb\forum\helper
+        arguments:
+            - '@config'
+            - '@dbal.conn'
+            - '@dispatcher'
+            - '@user'
     forum.controller.index:
         class: phpbb\forum\controller\index
         arguments:
@@ -25,3 +31,202 @@ services:
             - '@template'
             - '%core.root_path%'
             - '%core.php_ext%'
+
+    forum.data.viewforum_repository:
+        class: phpbb\forum\data\viewforum_repository
+        arguments:
+            - '@dbal.conn'
+            - '@dispatcher'
+            - '%tables.forums%'
+            - '%tables.forums_track%'
+            - '%tables.forums_watch%'
+
+    forum.service.viewforum_topics:
+        class: phpbb\forum\service\viewforum_topics
+        arguments:
+            - '@auth'
+            - '@config'
+            - '@content.visibility'
+            - '@dbal.conn'
+            - '@dispatcher'
+            - '@pagination'
+            - '@user'
+            - '%tables.topics%'
+            - '%tables.topics_posted%'
+            - '%tables.topics_track%'
+            - '%tables.forums%'
+            - '%tables.forums_track%'
+
+
+    forum.service.viewforum_topic_renderer:
+        class: phpbb\forum\service\viewforum_topic_renderer
+        arguments:
+            - '@auth'
+            - '@cache'
+            - '@config'
+            - '@content.visibility'
+            - '@dispatcher'
+            - '@pagination'
+            - '@template'
+            - '@user'
+            - '%core.root_path%'
+            - '%core.php_ext%'
+
+    forum.service.viewforum_page:
+        class: phpbb\forum\service\viewforum_page
+        arguments:
+            - '@auth'
+            - '@config'
+            - '@controller.helper'
+            - '@content.visibility'
+            - '@cron.manager'
+            - '@dbal.conn'
+            - '@dispatcher'
+            - '@forum.data.viewforum_repository'
+            - '@pagination'
+            - '@request'
+            - '@template'
+            - '@user'
+            - '%core.root_path%'
+            - '%core.php_ext%'
+
+    forum.service.viewforum_handler:
+        class: phpbb\forum\service\viewforum_handler
+        arguments:
+            - '@auth'
+            - '@config'
+            - '@request'
+            - '@user'
+            - '@forum.data.viewforum_repository'
+            - '@forum.service.viewforum_page'
+            - '@forum.service.viewforum_topics'
+            - '@forum.service.viewforum_topic_renderer'
+
+    forum.controller.viewforum:
+        class: phpbb\forum\controller\viewforum
+        arguments:
+            - '@forum.service.viewforum_handler'
+
+    forum.data.viewtopic_repository:
+        class: phpbb\forum\data\viewtopic_repository
+        arguments:
+            - '@dbal.conn'
+            - '@content.visibility'
+            - '%tables.forums%'
+            - '%tables.posts%'
+            - '%tables.topics%'
+            - '%tables.topics_watch%'
+            - '%tables.bookmarks%'
+            - '%tables.topics_track%'
+            - '%tables.forums_track%'
+
+    forum.service.viewtopic_navigation:
+        class: phpbb\forum\service\viewtopic_navigation
+        arguments:
+            - '@dbal.conn'
+            - '@content.visibility'
+            - '@user'
+            - '%tables.topics%'
+            - '%tables.posts%'
+            - '%tables.forums%'
+
+    forum.service.viewtopic_page:
+        class: phpbb\forum\service\viewtopic_page
+        arguments:
+            - '@auth'
+            - '@cache'
+            - '@config'
+            - '@content.visibility'
+            - '@dbal.conn'
+            - '@dispatcher'
+            - '@pagination'
+            - '@request'
+            - '@template'
+            - '@user'
+            - '%core.root_path%'
+            - '%core.php_ext%'
+
+    forum.service.viewtopic_posts:
+        class: phpbb\forum\service\viewtopic_posts
+        arguments:
+            - '@auth'
+            - '@avatar.helper'
+            - '@config'
+            - '@content.visibility'
+            - '@dbal.conn'
+            - '@dispatcher'
+            - '@profilefields.manager'
+            - '@user'
+            - '%tables.posts%'
+            - '%tables.users%'
+            - '%tables.zebra%'
+            - '%tables.sessions%'
+            - '%core.root_path%'
+            - '%core.php_ext%'
+
+    forum.service.viewtopic_post_renderer:
+        class: phpbb\forum\service\viewtopic_post_renderer
+        arguments:
+            - '@auth'
+            - '@avatar.helper'
+            - '@config'
+            - '@controller.helper'
+            - '@dbal.conn'
+            - '@dispatcher'
+            - '@profilefields.manager'
+            - '@template'
+            - '@user'
+            - '%core.root_path%'
+            - '%core.php_ext%'
+
+    forum.service.viewtopic_poll:
+        class: phpbb\forum\service\viewtopic_poll
+        arguments:
+            - '@auth'
+            - '@config'
+            - '@dbal.conn'
+            - '@dispatcher'
+            - '@request'
+            - '@template'
+            - '@user'
+            - '%core.root_path%'
+            - '%core.php_ext%'
+
+    forum.service.viewtopic_completion:
+        class: phpbb\forum\service\viewtopic_completion
+        arguments:
+            - '@auth'
+            - '@config'
+            - '@dbal.conn'
+            - '@dispatcher'
+            - '@pagination'
+            - '@request'
+            - '@template'
+            - '@user'
+            - '%core.root_path%'
+            - '%core.php_ext%'
+
+    forum.service.viewtopic_handler:
+        class: phpbb\forum\service\viewtopic_handler
+        arguments:
+            - '@auth'
+            - '@config'
+            - '@content.visibility'
+            - '@dispatcher'
+            - '@pagination'
+            - '@request'
+            - '@user'
+            - '@forum.service.viewtopic_navigation'
+            - '@forum.data.viewtopic_repository'
+            - '@forum.service.viewtopic_page'
+            - '@forum.service.viewtopic_poll'
+            - '@forum.service.viewtopic_posts'
+            - '@forum.service.viewtopic_post_renderer'
+            - '@forum.service.viewtopic_completion'
+            - '%core.root_path%'
+            - '%core.php_ext%'
+
+    forum.controller.viewtopic:
+        class: phpbb\forum\controller\viewtopic
+        arguments:
+            - '@forum.service.viewtopic_handler'

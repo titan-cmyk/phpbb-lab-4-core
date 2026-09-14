@@ -539,8 +539,8 @@ function phpbb_timezone_select($user, $default = '', $truncate = false)
 * Marks a topic as posted to
 *
 * @param string $mode (all, topics, topic, post)
-* @param int|bool $forum_id Used in all, topics, and topic mode
-* @param int|bool $topic_id Used in topic and post mode
+* @param array|int|false $forum_id Used in all, topics, and topic mode
+* @param int|false $topic_id Used in topic and post mode
 * @param int $post_time 0 means current time(), otherwise to set a specific mark time
 * @param int $user_id can only be used with $mode == 'post'
 */
@@ -2564,7 +2564,6 @@ function login_box($redirect = '', $l_explain = '', $l_success = '', $admin = fa
 	$template->set_filenames(array(
 		'body' => 'login_body.html')
 	);
-	make_jumpbox(append_sid("{$phpbb_root_path}viewforum.$phpEx"));
 
 	page_footer();
 }
@@ -2659,7 +2658,6 @@ function login_forum_box($forum_data)
 		'body' => 'login_forum.html')
 	);
 
-	make_jumpbox(append_sid("{$phpbb_root_path}viewforum.$phpEx"), $forum_data['forum_id']);
 
 	page_footer();
 }

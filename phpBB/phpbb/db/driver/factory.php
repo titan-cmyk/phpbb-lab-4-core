@@ -124,6 +124,62 @@ class factory implements driver_interface
 	}
 
 	/**
+	 * {@inheritdoc}
+	 */
+	public function get_doctrine_connection()
+	{
+		return $this->get_driver()->get_doctrine_connection();
+	}
+
+	/**
+	 * {@inheritdoc}
+	 */
+	public function doctrine_execute_query($sql, array $params = [], array $types = [])
+	{
+		return $this->get_driver()->doctrine_execute_query($sql, $params, $types);
+	}
+
+	/**
+	 * {@inheritdoc}
+	 */
+	public function doctrine_execute_statement($sql, array $params = [], array $types = [])
+	{
+		return $this->get_driver()->doctrine_execute_statement($sql, $params, $types);
+	}
+
+	/**
+	 * {@inheritdoc}
+	 */
+	public function doctrine_fetch_associative($sql, array $params = [], array $types = [])
+	{
+		return $this->get_driver()->doctrine_fetch_associative($sql, $params, $types);
+	}
+
+	/**
+	 * {@inheritdoc}
+	 */
+	public function doctrine_fetch_all_associative($sql, array $params = [], array $types = [])
+	{
+		return $this->get_driver()->doctrine_fetch_all_associative($sql, $params, $types);
+	}
+
+	/**
+	 * {@inheritdoc}
+	 */
+	public function doctrine_fetch_one($sql, array $params = [], array $types = [])
+	{
+		return $this->get_driver()->doctrine_fetch_one($sql, $params, $types);
+	}
+
+	/**
+	 * {@inheritdoc}
+	 */
+	public function doctrine_create_query_builder()
+	{
+		return $this->get_driver()->doctrine_create_query_builder();
+	}
+
+	/**
 	* {@inheritdoc}
 	*/
 	public function get_sql_error_triggered()
@@ -348,11 +404,50 @@ class factory implements driver_interface
 	}
 
 	/**
+	 * {@inheritdoc}
+	 */
+	public function sql_query_limit_params($query, $total, $offset = 0, array $params = [], array $types = [], $cache_ttl = 0)
+	{
+		return $this->get_driver()->sql_query_limit_params($query, $total, $offset, $params, $types, $cache_ttl);
+	}
+
+	/**
 	* {@inheritdoc}
 	*/
 	public function sql_query($query = '', $cache_ttl = 0)
 	{
 		return $this->get_driver()->sql_query($query, $cache_ttl);
+	}
+
+	/**
+	 * Execute a parameterized query using the active driver.
+	 *
+	 * @param string $query
+	 * @param array $params
+	 * @param array $types
+	 * @param int $cache_ttl
+	 * @return mixed
+	 */
+	public function sql_query_params($query, array $params = [], array $types = [], $cache_ttl = 0)
+	{
+		return $this->get_driver()->sql_query_params($query, $params, $types, $cache_ttl);
+	}
+
+
+	/**
+	 * {@inheritdoc}
+	 */
+	public function sql_build_array_params($query, $assoc_ary, array &$params, $prefix = 'p')
+	{
+		return $this->get_driver()->sql_build_array_params($query, $assoc_ary, $params, $prefix);
+	}
+
+	/**
+	 * {@inheritdoc}
+	 */
+	public function sql_in_set_params($field, $array, array &$params, $negate = false, $allow_empty_set = false, $prefix = 'in')
+	{
+		return $this->get_driver()->sql_in_set_params($field, $array, $params, $negate, $allow_empty_set, $prefix);
 	}
 
 	/**
